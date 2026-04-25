@@ -1,4 +1,5 @@
 FROM maven:3.8-openjdk-17 AS builder
+
 WORKDIR /app
 COPY pom.xml .
 COPY ruoyi-admin/ ruoyi-admin/
@@ -9,6 +10,7 @@ COPY ruoyi-quartz/ ruoyi-quartz/
 COPY ruoyi-system/ ruoyi-system/
 RUN mvn clean package -DskipTests
 
+# 改为 Debian 基础镜像，避免 Alpine 的 AWT 兼容问题
 FROM eclipse-temurin:17-jre
 
 # Debian 下安装 Python3、中文字体
@@ -37,5 +39,6 @@ ENV PYTHON_EXECUTABLE=python3 \
 RUN mkdir -p /app/uploadPath/config && chmod -R 777 /app/uploadPath
 WORKDIR /app
 COPY --from=builder /app/ruoyi-admin/target/ruoyi-admin.jar app.jar
+
 EXPOSE 8080
 ENTRYPOINT ["sh", "-c", "java -jar app.jar --server.port=${PORT:-8080}"]
