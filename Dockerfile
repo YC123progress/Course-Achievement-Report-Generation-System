@@ -12,7 +12,7 @@ RUN mvn clean package -DskipTests
 
 FROM eclipse-temurin:17-jre
 
-# 安装系统依赖：Python3、中文字体、Liberation字体（替代Arial等）、DejaVu字体
+# 安装系统依赖：Python3、字体、Liberation字体（替代Arial）、DejaVu字体
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 python3-pip \
     fontconfig \
@@ -20,6 +20,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     fonts-liberation \
     fonts-dejavu-core \
     && fc-cache -fv \
+    && mkdir -p /opt/java/openjdk/lib/fonts \
+    && cp /usr/share/fonts/truetype/liberation/*.ttf /opt/java/openjdk/lib/fonts/ \
     && pip3 install --no-cache-dir --break-system-packages \
         contourpy==1.3.3 \
         cycler==0.12.1 \
@@ -36,7 +38,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         tzdata==2026.1 \
     && rm -rf /var/lib/apt/lists/*
 
-# 设置环境变量
+# 环境变量：强制 matplotlib 使用非交互后端，Java 使用 headless 模式
 ENV PYTHON_EXECUTABLE=python3 \
     MPLBACKEND=Agg \
     JAVA_TOOL_OPTIONS="-Djava.awt.headless=true"
