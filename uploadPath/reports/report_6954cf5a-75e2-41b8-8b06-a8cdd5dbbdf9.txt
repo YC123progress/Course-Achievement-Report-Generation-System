@@ -1,0 +1,10 @@
+课程目标达成评价报告
+========================
+报告ID: 6954cf5a-75e2-41b8-8b06-a8cdd5dbbdf9
+配置ID: default_7e409d4e-eab1-433a-ad60-87f322ca3a77.json
+生成时间: Thu Jul 10 18:54:40 CST 2025
+
+注意：Word报告生成失败，已生成文本格式报告。
+错误信息：D:\projects\RuoYi-Vue-master-reall\uploadPath\config\default_7e409d4e-eab1-433a-ad60-87f322ca3a77
+
+请检查系统环境或联系管理员。

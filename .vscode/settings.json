@@ -1,0 +1,38 @@
+{
+    "java.compile.nullAnalysis.mode": "automatic",
+    "java.configuration.updateBuildConfiguration": "interactive",
+    "liveServer.settings.port": 5501,
+    "sqltools.connections": [
+        {
+            "mysqlOptions": {
+                "authProtocol": "default",
+                "enableSsl": "Disabled"
+            },
+            "ssh": "Disabled",
+            "previewLimit": 50,
+            "server": "localhost",
+            "port": 3306,
+            "driver": "MySQL",
+            "name": "ruoyi",
+            "database": "ruoyi",
+            "username": "root"
+        },
+        {
+            "mysqlOptions": {
+                "authProtocol": "default",
+                "enableSsl": "Disabled"
+            },
+            "ssh": "Disabled",
+            "previewLimit": 50,
+            "server": "localhost",
+            "port": 3306,
+            "driver": "MySQL",
+            "name": "e-trade",
+            "database": "e_tradedb",
+            "username": "root"
+        }
+    ],
+    "terminal.integrated.env.windows": {
+        "PATH": "${env:PATH};C:\\Users\\W3014\\AppData\\Local\\Programs\\Python\\Python314;C:\\Users\\W3014\\AppData\\Local\\Programs\\Python\\Python314\\Scripts"
+    }
+}

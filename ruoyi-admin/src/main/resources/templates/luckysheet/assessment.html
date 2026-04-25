@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:include="include :: header('课程目标达成评价报告')" />
+    <link rel="stylesheet" th:href="@{/ajax/libs/luckysheet/plugins/css/pluginsCss.css}" />
+    <link rel="stylesheet" th:href="@{/ajax/libs/luckysheet/plugins/plugins.css}" />
+    <link rel="stylesheet" th:href="@{/ajax/libs/luckysheet/css/luckysheet.css}" />
+    <link rel="stylesheet" th:href="@{/ajax/libs/luckysheet/assets/iconfont/iconfont.css}" />
+    <style>
+        .luckysheet-container {
+            width: 100%;
+            height: 600px;
+        }
+        .config-panel {
+            margin-bottom: 20px;
+        }
+        .result-panel {
+            margin-top: 20px;
+        }
+        .result-item {
+            margin-bottom: 15px;
+        }
+        .result-item img {
+            max-width: 100%;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 5px;
+        }
+        .btn-panel {
+            margin: 10px 0;
+        }
+        .or-separator {
+            display: flex;
+            align-items: center;
+            text-align: center;
+            margin: 15px 0;
+        }
+        .or-separator::before, .or-separator::after {
+            content: '';
+            flex: 1;
+            border-bottom: 1px solid #ddd;
+        }
+        .or-separator::before {
+            margin-right: 10px;
+        }
+        .or-separator::after {
+            margin-left: 10px;
+        }
+    </style>
+</head>
+<body class="gray-bg">
+    <div class="container-div">
+        <div class="row">
+            <div class="col-sm-12">
+                <div class="ibox">
+                    <div class="ibox-title">
+                        <h5>课程目标达成评价报告生成工具</h5>
+                    </div>
+                    <div class="ibox-content">
+                        <div class="config-panel">
+                            <h4>第一步：选择课程配置</h4>
+                            <div class="form-group">
+                                <label>上传配置文件（JSON格式）</label>
+                                <div class="file-loading">
+                                    <input id="configFile" name="file" type="file" accept=".json">
+                                </div>
+                                <input type="hidden" id="configId" name="configId">
+                            </div>
+                            <button type="button" class="btn btn-primary" onclick="uploadConfig()">上传配置文件</button>
+                            
+                            <div class="or-separator">
+                                <span>或者</span>
+                            </div>
+                            
+                            <button type="button" class="btn btn-success" onclick="useDefaultConfig()">使用默认配置</button>
+                            <p class="help-block mt-3">
+                                默认配置包含了示例课程目标和考核方式，可直接用于测试系统功能。
+                            </p>
+                        </div>
+                        
+                        <div class="template-panel" style="display: none;">
+                            <h4>第二步：填写学生成绩数据</h4>
+                            <p>请在下方Excel表格中输入学生成绩数据：</p>
+                            <div id="luckysheet" class="luckysheet-container"></div>
+                            <div class="btn-panel">
+                                <button type="button" class="btn btn-success" onclick="processData()">生成评价报告</button>
+                            </div>
+                        </div>
+                        
+                        <div class="result-panel" id="resultsContainer" style="display: none;">
+                            <!-- 这里将显示处理结果 -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <th:block th:include="include :: footer" />
+    <script th:src="@{/ajax/libs/luckysheet/plugins/js/plugin.js}"></script>
+    <script th:src="@{/ajax/libs/luckysheet/luckysheet.umd.js}"></script>
+    
+    <script type="text/javascript">
+        var prefix = ctx + "luckysheet";
+        
+        // 初始化Luckysheet
+        function initLuckysheet(templateData) {
+            // 初始化配置
+            var options = {
+                container: 'luckysheet',
+                showinfobar: false,
+                data: []
+            };
+            
+            // 将模板数据转换为Luckysheet格式
+            if (templateData && templateData.sheets) {
+                templateData.sheets.forEach(function(sheet, index) {
+                    var sheetData = {
+                        name: sheet.name,
+                        index: index,
+                        status: index === 0 ? 1 : 0, // 第一个sheet为活动状态
+                        order: index,
+                        row: 100, // 默认行数
+                        column: 20, // 默认列数
+                        celldata: []
+                    };
+                    
+                    // 添加表头
+                    if (sheet.headers) {
+                        sheet.headers.forEach(function(header, colIndex) {
+                            sheetData.celldata.push({
+                                r: 0,
+                                c: colIndex,
+                                v: {
+                                    v: header,
+                                    ct: { fa: "@", t: "s" },
+                                    bg: "#f1f1f1" // 表头背景色
+                                }
+                            });
+                        });
+                    }
+                    
+                    options.data.push(sheetData);
+                });
+            }
+            
+            // 初始化Luckysheet
+            luckysheet.create(options);
+        }
+
+        // 上传配置文件
+        function uploadConfig() {
+            var formData = new FormData();
+            var fileInput = $('#configFile')[0];
+            
+            if (fileInput.files.length === 0) {
+                $.modal.alertWarning("请选择配置文件");
+                return;
+            }
+            
+            formData.append('file', fileInput.files[0]);
+            
+            $.ajax({
+                url: prefix + '/upload-config',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(response) {
+                    if (response.code === 0) {
+                        $("#configId").val(response.configId);
+                        $.modal.msgSuccess("配置文件上传成功");
+                        generateTemplate(response.configId);
+                    } else {
+                        $.modal.alertError(response.msg);
+                    }
+                }
+            });
+        }
+
+        // 使用默认配置
+        function useDefaultConfig() {
+            $.modal.loading("正在加载默认配置...");
+            $.ajax({
+                url: prefix + '/use-default-config',
+                type: 'GET',
+                success: function(response) {
+                    $.modal.closeLoading();
+                    if (response.code === 0) {
+                        $("#configId").val(response.configId);
+                        $.modal.msgSuccess("已成功加载默认配置");
+                        generateTemplate(response.configId);
+                    } else {
+                        $.modal.alertError(response.msg);
+                    }
+                },
+                error: function() {
+                    $.modal.closeLoading();
+                    $.modal.alertError("加载默认配置失败");
+                }
+            });
+        }
+
+        // 生成Excel模板
+        function generateTemplate(configId) {
+            $.ajax({
+                url: prefix + '/generate-template',
+                type: 'GET',
+                data: { configId: configId },
+                success: function(response) {
+                    if (response.code === 0) {
+                        // 显示模板面板
+                        $('.template-panel').show();
+                        // 初始化Luckysheet
+                        initLuckysheet(response.templateData);
+                    } else {
+                        $.modal.alertError(response.msg);
+                    }
+                }
+            });
+        }
+
+        // 获取Luckysheet数据并提交
+        function processData() {
+            $.modal.loading("正在处理数据，请稍候...");
+            
+            var sheetsData = [];
+            var allSheets = luckysheet.getAllSheets();
+            
+            if (!allSheets || allSheets.length === 0) {
+                $.modal.closeLoading();
+                $.modal.alertWarning("没有可处理的数据");
+                return;
+            }
+            
+            allSheets.forEach(function(sheet) {
+                var sheetData = {
+                    name: sheet.name,
+                    data: []
+                };
+                
+                try {
+                    // 获取sheet的原始数据
+                    var celldata = sheet.celldata || [];
+                    var rows = {};
+                    var maxRow = 0;
+                    var maxCol = 0;
+                    
+                    // 构建行列数据
+                    celldata.forEach(function(cell) {
+                        if (!rows[cell.r]) {
+                            rows[cell.r] = {};
+                        }
+                        rows[cell.r][cell.c] = cell.v && cell.v.v !== undefined ? cell.v.v : '';
+                        maxRow = Math.max(maxRow, cell.r);
+                        maxCol = Math.max(maxCol, cell.c);
+                    });
+                    
+                    // 转换为二维数组格式
+                    for (var i = 0; i <= maxRow; i++) {
+                        var rowData = [];
+                        for (var j = 0; j <= maxCol; j++) {
+                            var value = rows[i] && rows[i][j] !== undefined ? rows[i][j] : '';
+                            // 确保值为字符串或数字
+                            if (typeof value === 'object' && value !== null) {
+                                value = value.toString();
+                            }
+                            rowData.push(value);
+                        }
+                        // 过滤空行
+                        if (rowData.some(cell => cell !== '')) {
+                            sheetData.data.push(rowData);
+                        }
+                    }
+                    
+                    console.log('Sheet data:', sheet.name, sheetData.data);
+                    sheetsData.push(sheetData);
+                } catch (error) {
+                    console.error('处理sheet数据时出错:', sheet.name, error);
+                }
+            });
+            
+            if (sheetsData.length === 0) {
+                $.modal.closeLoading();
+                $.modal.alertWarning("没有有效的数据可处理");
+                return;
+            }
+            
+            // 发送数据到服务器
+            $.ajax({
+                url: prefix + '/process-data',
+                type: 'POST',
+                contentType: 'application/json; charset=UTF-8',
+                data: JSON.stringify({
+                    sheets: sheetsData
+                }),
+                beforeSend: function(xhr) {
+                    xhr.setRequestHeader("configId", $("#configId").val());
+                    xhr.setRequestHeader("Accept-Charset", "UTF-8");
+                },
+                success: function(response) {
+                    $.modal.closeLoading();
+                    if (response.code === 0) {
+                        $.modal.msgSuccess("数据处理完成");
+                        showResults(response.results, response.reportId);
+                    } else {
+                        $.modal.alertError("数据处理失败：" + (response.msg || "未知错误"));
+                    }
+                },
+                error: function(xhr, status, error) {
+                    $.modal.closeLoading();
+                    console.error('AJAX错误:', status, error, xhr.responseText);
+                    $.modal.alertError("请求失败：" + error);
+                }
+            });
+        }
+
+        // 显示处理结果
+        function showResults(results, reportId) {
+            var configId = $("#configId").val();
+            var html = '<h4>课程目标达成评价结果</h4>';
+            
+            console.log("显示结果:", results, "configId:", configId);
+            
+            // 检查是否有结果数据
+            if (!results || Object.keys(results).length === 0) {
+                html += '<div class="alert alert-warning">暂无结果数据</div>';
+                $('#resultsContainer').html(html).show();
+                return;
+            }
+            
+            // 成绩分布图
+            if (results.gradeDistributionChart) {
+                var imageUrl = prefix + '/result/' + configId + '/' + results.gradeDistributionChart;
+                console.log("成绩分布图URL:", imageUrl);
+                html += '<div class="result-item">';
+                html += '<h5>成绩分布图</h5>';
+                html += '<img src="' + imageUrl + '" ';
+                html += 'alt="成绩分布图" style="max-width:100%; cursor:pointer;" ';
+                html += 'onerror="console.error(\'图片加载失败:\', this.src); this.style.display=\'none\'; this.nextSibling.style.display=\'block\';" ';
+                html += 'onclick="window.open(this.src, \'_blank\')" />';
+                html += '<div style="display:none; color:#999; font-style:italic; padding:10px; border:1px dashed #ccc;">';
+                html += '图片加载失败<br>URL: ' + imageUrl + '</div>';
+                html += '</div>';
+            }
+            
+            // 课程目标达成度柱状图
+            if (results.achievementBarChart) {
+                var imageUrl = prefix + '/result/' + configId + '/' + results.achievementBarChart;
+                console.log("柱状图URL:", imageUrl);
+                html += '<div class="result-item">';
+                html += '<h5>课程目标达成度柱状图</h5>';
+                html += '<img src="' + imageUrl + '" ';
+                html += 'alt="课程目标达成度柱状图" style="max-width:100%; cursor:pointer;" ';
+                html += 'onerror="console.error(\'图片加载失败:\', this.src); this.style.display=\'none\'; this.nextSibling.style.display=\'block\';" ';
+                html += 'onclick="window.open(this.src, \'_blank\')" />';
+                html += '<div style="display:none; color:#999; font-style:italic; padding:10px; border:1px dashed #ccc;">';
+                html += '图片加载失败<br>URL: ' + imageUrl + '</div>';
+                html += '</div>';
+            }
+            
+            // 散点图
+            if (results.scatterCharts && results.scatterCharts.length > 0) {
+                html += '<div class="result-item">';
+                html += '<h5>课程目标达成度散点图</h5>';
+                results.scatterCharts.forEach(function(chart) {
+                    var imageUrl = prefix + '/result/' + configId + '/' + chart;
+                    console.log("散点图URL:", imageUrl);
+                    html += '<div style="margin-bottom: 10px;">';
+                    html += '<h6>' + chart.replace('_achievement_scatter_chart.png', ' 达成度散点图') + '</h6>';
+                    html += '<img src="' + imageUrl + '" ';
+                    html += 'alt="' + chart + '" style="max-width:100%; cursor:pointer;" ';
+                    html += 'onerror="console.error(\'图片加载失败:\', this.src); this.style.display=\'none\'; this.nextSibling.style.display=\'block\';" ';
+                    html += 'onclick="window.open(this.src, \'_blank\')" />';
+                    html += '<div style="display:none; color:#999; font-style:italic; padding:10px; border:1px dashed #ccc;">';
+                    html += '图片加载失败: ' + chart + '<br>URL: ' + imageUrl + '</div>';
+                    html += '</div>';
+                });
+                html += '</div>';
+            }
+            
+            // 数据表格链接
+            if (results.quantitativeEvaluation || results.achievementTable) {
+                html += '<div class="result-item">';
+                html += '<h5>数据表格</h5>';
+                if (results.quantitativeEvaluation) {
+                    var csvUrl = prefix + '/result/' + configId + '/' + results.quantitativeEvaluation;
+                    html += '<a href="' + csvUrl + '" ';
+                    html += 'class="btn btn-sm btn-info" target="_blank" style="margin-right:10px;">查看定量评价数据</a>';
+                }
+                if (results.achievementTable) {
+                    var csvUrl = prefix + '/result/' + configId + '/' + results.achievementTable;
+                    html += '<a href="' + csvUrl + '" ';
+                    html += 'class="btn btn-sm btn-info" target="_blank">查看整体达成情况</a>';
+                }
+                html += '</div>';
+            }
+            
+            // 下载报告按钮
+            html += '<div class="result-item">';
+            html += '<h5>生成报告</h5>';
+            html += '<a href="' + prefix + '/download-report/' + reportId + '?configId=' + configId + '" ';
+            html += 'class="btn btn-primary">下载完整Word报告</a>';
+            html += '</div>';
+            
+            // 调试信息（可选）
+            html += '<div class="result-item" style="margin-top: 20px;">';
+            html += '<details>';
+            html += '<summary style="cursor: pointer; color: #666;">调试信息（点击展开）</summary>';
+            html += '<pre style="background: #f5f5f5; padding: 10px; font-size: 12px; overflow-x: auto;">';
+            html += 'configId: ' + configId + '\n';
+            html += 'results: ' + JSON.stringify(results, null, 2);
+            html += '</pre>';
+            html += '</details>';
+            html += '</div>';
+            
+            $('#resultsContainer').html(html).show();
+            
+            // 滚动到结果区域
+            $('html, body').animate({
+                scrollTop: $('#resultsContainer').offset().top - 50
+            }, 500);
+        }
+    </script>
+</body>
+</html> 
