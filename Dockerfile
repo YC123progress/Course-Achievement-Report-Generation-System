@@ -10,6 +10,7 @@ COPY ruoyi-system/ ruoyi-system/
 RUN mvn clean package -DskipTests
 
 FROM eclipse-temurin:17-jre-alpine
+RUN mkdir -p /app/uploadPath/config && chmod -R 777 /app/uploadPath
 WORKDIR /app
 COPY --from=builder /app/ruoyi-admin/target/ruoyi-admin.jar app.jar
 EXPOSE 8080
