@@ -11,8 +11,8 @@ server {
 
     location /dev-api/ {
         rewrite ^/dev-api/(.*)$ /$1 break;
-        # 注意：使用 Railway 内部网络地址，服务名建议全小写
-        proxy_pass http://course-achievement-report-generation-system:8080;
+        # 使用 Railway 内部网络地址（端口 8080）
+        proxy_pass http://course-achievement-report-genera.railway.internal:8080;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
