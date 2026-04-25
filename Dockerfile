@@ -13,4 +13,4 @@ FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 COPY --from=builder /app/ruoyi-admin/target/ruoyi-admin.jar app.jar
 EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT ["sh", "-c", "java -jar app.jar --server.port=${PORT:-8080} --spring.datasource.druid.url=${DB_URL} --spring.datasource.druid.username=${DB_USERNAME} --spring.datasource.druid.password=${DB_PASSWORD} --spring.redis.host=${REDIS_HOST:-redis.railway.internal} --spring.redis.port=${REDIS_PORT:-6379} --spring.redis.password=${REDIS_PASSWORD}"]
