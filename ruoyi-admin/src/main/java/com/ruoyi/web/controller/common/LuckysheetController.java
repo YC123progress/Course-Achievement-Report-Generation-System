@@ -829,7 +829,7 @@ public class LuckysheetController {
             pythonExecutable,
             "scripts/main.py",
             workingDir,
-            600,  // 将超时时间从300秒改为600秒（10分钟）
+            60,
             null // 环境变量
         );
         

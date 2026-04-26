@@ -157,6 +157,6 @@ python:
   # 1. 绝对路径（推荐）：如 C:/Python313/python.exe
   # 2. 相对路径：如 python（需要在系统PATH中）
   # 3. 自动检测：设置为 auto 将自动尝试找到Python
-  executable: C:/Users/W3014/AppData/Local/Programs/Python/Python314/python.exe
+  executable: ${PYTHON_EXECUTABLE:python3}
   script:
     path: classpath:scripts
