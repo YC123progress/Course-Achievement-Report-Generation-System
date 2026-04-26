@@ -4,7 +4,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.io.ClassPathResource;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -12,143 +17,114 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Python脚本运行工具类
+ * Runs Python scripts bundled in classpath resources.
  */
 public class PythonScriptRunner {
-    
+
     private static final Logger log = LoggerFactory.getLogger(PythonScriptRunner.class);
 
-    /**
-     * 运行Python脚本
-     * @param pythonExecutable Python可执行文件路径
-     * @param scriptResource 脚本资源路径
-     * @param workingDirectory 工作目录
-     * @param timeoutSeconds 超时时间（秒）
-     * @param environmentVars 环境变量
-     * @return 是否执行成功
-     */
-    public static boolean runScript(String pythonExecutable, String scriptResource, 
-                                   String workingDirectory, int timeoutSeconds, 
-                                   Map<String, String> environmentVars) {
+    public static boolean runScript(String pythonExecutable, String scriptResource,
+                                    String workingDirectory, int timeoutSeconds,
+                                    Map<String, String> environmentVars) {
         String tempScriptPath = null;
-        
+
         try {
-            // 1. 从classpath加载脚本到临时文件
-            log.info("从classpath加载脚本: {}", scriptResource);
+            log.info("Loading Python script from classpath: {}", scriptResource);
             ClassPathResource resource = new ClassPathResource(scriptResource);
-            
-            // 创建临时文件
+
             String scriptName = scriptResource.substring(scriptResource.lastIndexOf('/') + 1);
-            tempScriptPath = System.getProperty("java.io.tmpdir") + File.separator + 
-                           "python_script_" + System.nanoTime() + "_" + scriptName;
-            
-            // 复制脚本内容到临时文件（Java 8兼容方式）
+            tempScriptPath = System.getProperty("java.io.tmpdir") + File.separator
+                    + "python_script_" + System.nanoTime() + "_" + scriptName;
+
             try (InputStream is = resource.getInputStream();
                  FileOutputStream fos = new FileOutputStream(tempScriptPath)) {
-                
                 byte[] buffer = new byte[4096];
                 int bytesRead;
                 while ((bytesRead = is.read(buffer)) != -1) {
                     fos.write(buffer, 0, bytesRead);
                 }
             }
-            
-            log.info("=== Python脚本执行详细信息 ===");
-            log.info("Python路径: {}", pythonExecutable);
-            log.info("脚本路径: {}", tempScriptPath);
-            log.info("工作目录: {}", workingDirectory);
-            log.info("完整命令: {} {}", pythonExecutable, tempScriptPath);
-            
-            // 检查工作目录
+
             File workDir = new File(workingDirectory);
-            log.info("工作目录是否存在: {}", workDir.exists());
-            log.info("工作目录绝对路径: {}", workDir.getAbsolutePath());
-            
-            // 检查Python可执行文件
-            if (!pythonExecutable.equals("python") && !pythonExecutable.equals("python3") && !pythonExecutable.equals("py")) {
-                File pythonFile = new File(pythonExecutable);
-                log.info("Python可执行文件是否存在: {}", pythonFile.exists());
-                if (!pythonFile.exists()) {
-                    log.warn("Python可执行文件不存在: {}", pythonExecutable);
-                }
-            } else {
-                log.info("使用系统PATH中的Python: {}", pythonExecutable);
-            }
-            
-            // 检查临时脚本文件
             File tempScript = new File(tempScriptPath);
-            log.info("临时脚本文件: {}", tempScriptPath);
-            log.info("临时脚本文件是否存在: {}", tempScript.exists());
-            log.info("临时脚本文件大小: {} bytes", tempScript.length());
-            
-            // 2. 执行Python脚本
+
+            log.info("=== Python script execution ===");
+            log.info("Python executable: {}", pythonExecutable);
+            log.info("Script path: {}", tempScriptPath);
+            log.info("Working directory: {}", workDir.getAbsolutePath());
+            log.info("Working directory exists: {}", workDir.exists());
+            log.info("Temp script exists: {}, size: {} bytes", tempScript.exists(), tempScript.length());
+
             ProcessBuilder pb = new ProcessBuilder(pythonExecutable, tempScriptPath);
             pb.directory(workDir);
-            
-            // 设置环境变量，确保Python输出使用UTF-8编码
+
             Map<String, String> env = pb.environment();
             env.put("PYTHONIOENCODING", "utf-8");
             env.put("PYTHONUNBUFFERED", "1");
             if (environmentVars != null) {
                 env.putAll(environmentVars);
             }
-            
-            log.info("执行Python脚本: {} {}", pythonExecutable, tempScriptPath);
-            
+
+            log.info("Starting Python process: {} {}", pythonExecutable, tempScriptPath);
             Process process = pb.start();
-            log.info("进程启动成功");
-            
-            // 读取输出和错误流
+
             StringBuilder output = new StringBuilder();
             StringBuilder errorOutput = new StringBuilder();
-            
-            // 使用UTF-8编码读取输出
-            BufferedReader reader = new BufferedReader(
-                new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8));
-            BufferedReader errorReader = new BufferedReader(
-                new InputStreamReader(process.getErrorStream(), StandardCharsets.UTF_8));
-            
-            String line;
-            while ((line = reader.readLine()) != null) {
-                output.append(line).append("\n");
-                log.info("Python输出: {}", line);
-            }
-            
-            while ((line = errorReader.readLine()) != null) {
-                errorOutput.append(line).append("\n");
-                log.error("Python错误: {}", line);
-            }
-            
-            // 等待进程完成
+            Thread stdoutThread = new Thread(() -> readProcessStream(process.getInputStream(), output, false),
+                    "python-stdout-reader");
+            Thread stderrThread = new Thread(() -> readProcessStream(process.getErrorStream(), errorOutput, true),
+                    "python-stderr-reader");
+            stdoutThread.start();
+            stderrThread.start();
+
             boolean finished = process.waitFor(timeoutSeconds, TimeUnit.SECONDS);
             if (!finished) {
-                log.error("Python脚本执行超时");
+                log.error("Python script timed out after {} seconds", timeoutSeconds);
                 process.destroyForcibly();
+                stdoutThread.join(1000);
+                stderrThread.join(1000);
                 return false;
             }
-            
+
+            stdoutThread.join(1000);
+            stderrThread.join(1000);
+
             int exitCode = process.exitValue();
-            log.info("Python完整输出:\n{}", output.toString());
+            log.info("Python stdout:\n{}", output);
             if (errorOutput.length() > 0) {
-                log.error("Python完整错误输出:\n{}", errorOutput.toString());
+                log.error("Python stderr:\n{}", errorOutput);
             }
-            log.info("Python脚本执行完成，退出码: {}", exitCode);
-            
+            log.info("Python script exited with code: {}", exitCode);
+
             return exitCode == 0;
-            
         } catch (Exception e) {
-            log.error("执行Python脚本时发生异常", e);
+            log.error("Failed to execute Python script", e);
             return false;
         } finally {
-            // 清理临时文件
             if (tempScriptPath != null) {
                 try {
                     Files.deleteIfExists(Paths.get(tempScriptPath));
-                    log.debug("临时脚本文件已删除: {}", tempScriptPath);
                 } catch (Exception e) {
-                    log.warn("删除临时脚本文件失败: {}", e.getMessage());
+                    log.warn("Failed to delete temporary Python script {}: {}", tempScriptPath, e.getMessage());
                 }
             }
         }
     }
-} 
+
+    private static void readProcessStream(InputStream inputStream, StringBuilder output, boolean error) {
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                output.append(line).append("\n");
+                if (error) {
+                    log.error("Python stderr: {}", line);
+                } else {
+                    log.info("Python stdout: {}", line);
+                }
+            }
+        } catch (IOException e) {
+            log.warn("Failed to read Python process stream: {}", e.getMessage());
+        }
+    }
+}
