@@ -1,0 +1,55 @@
+{
+"regularGrade": 30,
+"labGrade": 20,
+"finalExam": 50,
+"regularTotalScore": 100,
+"labTotalScore": 100,
+"finalTotalScore": 100,
+"courseTargets": [
+"课程目标1",
+"课程目标2"
+],
+"courseTargetProportions": [
+{
+"courseTarget": "课程目标1",
+"regularGrade": 18.0,
+"finalExam": 35.0,
+"lab": 20.0,
+"total": 73.0
+},
+{
+"courseTarget": "课程目标2",
+"regularGrade": 12.0,
+"finalExam": 15.0,
+"lab": 0,
+"total": 27.0
+}
+],
+"examPaper": [
+{
+"title": "1",
+"questions": [
+{
+"questionNumber": 1,
+"score": 10,
+"target": "课程目标1"
+},
+{
+"questionNumber": 2,
+"score": 15,
+"target": "课程目标1"
+}
+]
+},
+{
+"title": "2",
+"questions": [
+{
+"questionNumber": 1,
+"score": 25,
+"target": "课程目标2"
+}
+]
+}
+]
+} 

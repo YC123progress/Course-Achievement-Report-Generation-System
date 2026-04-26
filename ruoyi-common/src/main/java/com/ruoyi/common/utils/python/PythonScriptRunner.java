@@ -30,6 +30,7 @@ import java.util.concurrent.TimeoutException;
 public class PythonScriptRunner {
     
     private static final Logger log = LoggerFactory.getLogger(PythonScriptRunner.class);
+    private static final int MAX_STREAM_CAPTURE_CHARS = 64 * 1024;
     
     /**
      * 执行Python脚本
@@ -163,21 +164,38 @@ public class PythonScriptRunner {
     private static Callable<String> streamReader(final InputStream inputStream, final String streamName) {
         return () -> {
             StringBuilder output = new StringBuilder();
+            boolean truncated = false;
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
                 String line;
                 while ((line = reader.readLine()) != null) {
-                    output.append(line).append(System.lineSeparator());
-                    if ("stderr".equals(streamName)) {
-                        log.error("Python stderr: {}", line);
+                    if (output.length() < MAX_STREAM_CAPTURE_CHARS) {
+                        int remaining = MAX_STREAM_CAPTURE_CHARS - output.length();
+                        String lineWithSeparator = line + System.lineSeparator();
+                        output.append(lineWithSeparator, 0, Math.min(remaining, lineWithSeparator.length()));
                     } else {
-                        log.info("Python stdout: {}", line);
+                        truncated = true;
+                    }
+                    if ("stderr".equals(streamName)) {
+                        log.error("Python stderr: {}", abbreviate(line, 1000));
+                    } else {
+                        log.info("Python stdout: {}", abbreviate(line, 1000));
                     }
                 }
             } catch (IOException e) {
                 log.warn("读取Python {} 失败: {}", streamName, e.getMessage());
             }
+            if (truncated) {
+                output.append(System.lineSeparator()).append("... [truncated]");
+            }
             return output.toString();
         };
+    }
+
+    private static String abbreviate(String value, int maxLength) {
+        if (value == null || value.length() <= maxLength) {
+            return value;
+        }
+        return value.substring(0, maxLength) + "...";
     }
 
     private static String getFutureOutput(Future<String> future, String streamName, int timeoutSeconds) {

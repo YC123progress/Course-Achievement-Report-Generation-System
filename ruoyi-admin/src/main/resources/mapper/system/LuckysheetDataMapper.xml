@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.LuckysheetDataMapper">
+
+    <resultMap id="LuckysheetDataResult" type="com.ruoyi.system.domain.LuckysheetData">
+        <id property="id" column="id"/>
+        <result property="sheetName" column="sheet_name"/>
+        <result property="cellData" column="cell_data"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+    
+    <insert id="insertLuckysheetData" parameterType="com.ruoyi.system.domain.LuckysheetData" useGeneratedKeys="true" keyProperty="id">
+        insert into sys_luckysheet_data (
+            sheet_name, cell_data, create_by, create_time, remark
+        ) values (
+            #{sheetName}, #{cellData}, #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+    
+    <update id="updateLuckysheetData" parameterType="com.ruoyi.system.domain.LuckysheetData">
+        update sys_luckysheet_data
+        set sheet_name = #{sheetName},
+            cell_data = #{cellData},
+            update_by = #{updateBy},
+            update_time = sysdate(),
+            remark = #{remark}
+        where id = #{id}
+    </update>
+    
+    <select id="selectLuckysheetDataList" parameterType="com.ruoyi.system.domain.LuckysheetData" resultMap="LuckysheetDataResult">
+        select id, sheet_name, cell_data, create_by, create_time, update_by, update_time, remark
+        from sys_luckysheet_data
+        <where>
+            <if test="sheetName != null and sheetName != ''">
+                AND sheet_name like concat('%', #{sheetName}, '%')
+            </if>
+        </where>
+        order by create_time desc
+    </select>
+</mapper> 

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>编码修复测试</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <h1>编码修复测试页面</h1>
+    
+    <h2>测试数据</h2>
+    <p>课程目标1: 测试中文显示</p>
+    <p>课程目标2: 数据库设计</p>
+    <p>课程目标3: 程序开发</p>
+    <p>课程目标4: 系统测试</p>
+    
+    <h2>测试按钮</h2>
+    <button onclick="testDefaultConfig()">测试默认配置</button>
+    <button onclick="testDataSubmission()">测试数据提交</button>
+    
+    <h2>测试结果</h2>
+    <div id="result"></div>
+    
+    <script>
+        function testDefaultConfig() {
+            console.log("测试默认配置加载...");
+            $("#result").html("正在测试默认配置...");
+            
+            $.ajax({
+                url: '/luckysheet/use-default-config',
+                type: 'GET',
+                success: function(response) {
+                    console.log("默认配置响应:", response);
+                    $("#result").html("<h3>默认配置测试结果:</h3><pre>" + JSON.stringify(response, null, 2) + "</pre>");
+                    
+                    // 检查是否有乱码
+                    var configStr = JSON.stringify(response);
+                    var hasMojibake = configStr.includes('璇剧▼鐩爣') || configStr.includes('鐝骇') || configStr.includes('瀛﹀彿');
+                    
+                    if (hasMojibake) {
+                        $("#result").append("<p style='color: red;'>❌ 发现乱码！</p>");
+                    } else {
+                        $("#result").append("<p style='color: green;'>✅ 编码正常！</p>");
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error("错误:", error);
+                    $("#result").html("<p style='color: red;'>请求失败: " + error + "</p>");
+                }
+            });
+        }
+        
+        function testDataSubmission() {
+            console.log("测试数据提交...");
+            $("#result").html("正在测试数据提交...");
+            
+            // 构造包含中文的测试数据
+            var testData = {
+                sheets: [{
+                    name: "期末考试成绩",
+                    data: [
+                        ["班级", "学号", "姓名", "1.1（2.0分）", "1.2（2.0分）"],
+                        ["计算机2021-1班", "20210101", "张三", "1.8", "1.9"],
+                        ["计算机2021-1班", "20210102", "李四", "1.7", "1.8"]
+                    ]
+                }]
+            };
+            
+            $.ajax({
+                url: '/luckysheet/process-data',
+                type: 'POST',
+                contentType: 'application/json; charset=UTF-8',
+                data: JSON.stringify(testData),
+                beforeSend: function(xhr) {
+                    xhr.setRequestHeader("configId", "test-config-id");
+                    xhr.setRequestHeader("Accept-Charset", "UTF-8");
+                },
+                success: function(response) {
+                    console.log("数据提交响应:", response);
+                    $("#result").html("<h3>数据提交测试结果:</h3><pre>" + JSON.stringify(response, null, 2) + "</pre>");
+                    
+                    if (response.code === 0) {
+                        $("#result").append("<p style='color: green;'>✅ 数据提交成功！</p>");
+                    } else {
+                        $("#result").append("<p style='color: orange;'>⚠️ 数据提交返回错误: " + response.msg + "</p>");
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error("错误:", error, xhr.responseText);
+                    $("#result").html("<p style='color: red;'>请求失败: " + error + "</p>");
+                    $("#result").append("<p>响应内容: " + xhr.responseText + "</p>");
+                }
+            });
+        }
+    </script>
+</body>
+</html> 
