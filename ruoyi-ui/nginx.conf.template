@@ -1,0 +1,44 @@
+# ruoyi-ui/nginx.conf.template
+server {
+    listen __PORT__;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location ^~ /dev-api/ {
+        rewrite ^/dev-api/(.*)$ /$1 break;
+        proxy_pass http://course-achievement-report-genera.railway.internal:8080;
+
+        # 基础 Header 设置
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # === 以下配置专门解决大请求体转发问题 ===
+        client_max_body_size 50m;            # 允许上传最大50M
+        proxy_request_buffering on;          # 开启代理请求缓冲（确保临时文件内容也会被发送）
+        proxy_buffering on;                  # 开启代理响应缓冲
+        proxy_buffer_size 8k;                # 响应头缓冲区大小
+        proxy_buffers 8 16k;                # 响应体缓冲区数量与大小
+        proxy_busy_buffers_size 16k;        # 繁忙时可使用的缓冲
+        proxy_connect_timeout 300s;          # 连接超时
+        proxy_send_timeout 300s;             # 发送超时
+        proxy_read_timeout 300s;             # 读取超时
+    }
+
+    location ~* \.(css|js|jpg|jpeg|png|gif|ico|svg|woff|woff2|ttf|eot)$ {
+        expires 1M;
+        access_log off;
+        add_header Cache-Control "public";
+    }
+
+    location = /health {
+        return 200 'OK';
+        add_header Content-Type text/plain;
+    }
+}
